@@ -1,0 +1,2464 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="artifact-type" content="dashboard">
+  <meta name="design-style" content="briefing">
+  <title>Élections de mi-mandat 2026 aux États-Unis — Résultats et Carte Interactive</title>
+  
+  <!-- Polices autorisées (Style Briefing) -->
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Librairies cartographiques autorisées -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+
+  <style>
+    :root {
+      color-scheme: light;
+
+      /* Page et surfaces : papier blanc pierre chaleureux */
+      --background: #faf9f5;
+      --surface-container-low: #ffffff;
+      --surface-container: #f1efe8;
+      --surface-container-high: #e6e2d6;
+      --color-white: #ffffff;
+
+      /* Encre et textes */
+      --on-surface: #17181a;
+      --on-surface-variant: #56585c;
+
+      /* Filets et bordures */
+      --outline: #17181a;
+      --outline-variant: #dedad0;
+
+      /* Accents du style Briefing */
+      --primary: #17181a;
+      --on-primary: #faf9f5;
+      --primary-container: #f2b705;
+      --on-primary-container: #17181a;
+      --secondary: #1f4e5f;
+      --tertiary: #785008;
+      --error: #b42318;
+      --on-error: #ffffff;
+      --positive: #2b6e52;
+      --warning: #f2b705;
+      --focus: #1d70b8;
+
+      /* Couleurs électorales normalisées */
+      --dem-blue: #1d70b8;
+      --dem-dark: #124b80;
+      --dem-hold: #418ecd;
+      --dem-light: #e8f2fa;
+      --dem-border: #9ec5e8;
+      --dem-hover: #2983ce;
+
+      --gop-red: #d9381e;
+      --gop-dark: #9c2411;
+      --gop-hold: #e55e47;
+      --gop-light: #fbeae7;
+      --gop-border: #f0a89d;
+      --gop-hover: #e64c33;
+
+      --pending-gold: #d99000;
+      --pending-light: #fef7db;
+      --pending-border: #f7d268;
+
+      --no-race-fill: #e8e5dc;
+      --no-race-stroke: #cdc8be;
+      --no-race-text: #78746b;
+
+      /* Typographie Briefing */
+      --font-headline: 'Source Serif 4', serif;
+      --font-body: 'Plus Jakarta Sans', sans-serif;
+      --font-label: 'Geist Mono', monospace;
+
+      /* Échelle typographique */
+      --display-size: clamp(1.75rem, 1.35rem + 1.2vw, 2.25rem);
+      --headline-size: clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem);
+      --subhead-size: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+      --body-size: clamp(0.9375rem, 0.9rem + 0.15vw, 1rem);
+      --label-size: 0.75rem;
+
+      /* Échelle d'espacement (base 4px) */
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2.5rem;
+      --space-2xl: 4rem;
+      --space-3xl: 6rem;
+
+      /* Transitions */
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+      --dur-micro: 120ms;
+      --dur-short: 220ms;
+      --dur-long: 420ms;
+
+      /* Formes */
+      --rounded: 0.25rem;
+      --rounded-lg: 0.375rem;
+      --rounded-full: 0.25rem;
+
+      /* Effets Briefing */
+      --section-rule: 1.5px solid var(--outline);
+      --card-border: 1px solid var(--outline-variant);
+      --heading-tracking: -0.02em;
+      --label-tracking: 0.08em;
+    }
+
+    /* Réinitialisation de base */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      background-color: var(--background);
+      color: var(--on-surface);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.5;
+      overflow-x: clip;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Accessibilité : anneaux de focus nets */
+    :focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    /* Conteneur principal */
+    .dashboard-app {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: var(--space-md) var(--space-lg) var(--space-2xl) var(--space-lg);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    /* En-tête / Masthead */
+    .masthead {
+      border-bottom: var(--section-rule);
+      padding-bottom: var(--space-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .masthead-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-sm);
+    }
+
+    .dossier-pill-group {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .dossier-pill {
+      background-color: var(--primary-container);
+      color: var(--on-primary-container);
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 0.6875rem;
+      letter-spacing: var(--label-tracking);
+      text-transform: uppercase;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--rounded-full);
+      line-height: 1.2;
+    }
+
+    .status-badge {
+      background-color: var(--surface-container);
+      color: var(--on-surface);
+      border: 1px solid var(--outline-variant);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      font-weight: 500;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--rounded);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .masthead-meta {
+      font-family: var(--font-label);
+      font-size: 0.75rem;
+      color: var(--on-surface-variant);
+      letter-spacing: 0.04em;
+    }
+
+    .masthead-title {
+      font-family: var(--font-headline);
+      font-size: var(--display-size);
+      font-weight: 600;
+      letter-spacing: var(--heading-tracking);
+      line-height: 1.12;
+      color: var(--on-surface);
+    }
+
+    .masthead-subhead {
+      font-size: var(--subhead-size);
+      color: var(--secondary);
+      font-weight: 500;
+      max-width: 90ch;
+      line-height: 1.4;
+    }
+
+    /* Barre de synthèse du rapport de force (Balance of Power) */
+    .balance-section {
+      background-color: var(--surface-container-low);
+      border: var(--card-border);
+      border-radius: var(--rounded-lg);
+      padding: var(--space-md) var(--space-lg);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .balance-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-md);
+      border-bottom: 1px solid var(--outline-variant);
+      padding-bottom: var(--space-sm);
+    }
+
+    .race-tabs {
+      display: flex;
+      gap: var(--space-xs);
+      background-color: var(--surface-container);
+      padding: var(--space-xs);
+      border-radius: var(--rounded);
+      border: 1px solid var(--outline-variant);
+    }
+
+    .race-tab-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      font-family: var(--font-body);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--on-surface-variant);
+      padding: 0.45rem 0.85rem;
+      border-radius: var(--rounded);
+      cursor: pointer;
+      transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .race-tab-btn:hover {
+      color: var(--on-surface);
+      background-color: var(--surface-container-high);
+    }
+
+    .race-tab-btn.active {
+      background-color: var(--primary);
+      color: var(--on-primary);
+    }
+
+    .active-race-info {
+      font-family: var(--font-label);
+      font-size: 0.8125rem;
+      color: var(--on-surface-variant);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .majority-badge {
+      font-weight: 600;
+      color: var(--on-surface);
+      background-color: var(--surface-container);
+      padding: 0.2rem 0.45rem;
+      border-radius: var(--rounded);
+      border: 1px solid var(--outline-variant);
+    }
+
+    /* Barre visuelle de majorité */
+    .gauge-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .gauge-numbers {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      font-variant-numeric: tabular-nums lining-nums;
+    }
+
+    .gauge-side {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .gauge-party-name {
+      font-family: var(--font-label);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: var(--label-tracking);
+      font-weight: 600;
+    }
+
+    .gauge-party-name.dem { color: var(--dem-blue); }
+    .gauge-party-name.gop { color: var(--gop-red); text-align: right; }
+
+    .gauge-big-num {
+      font-family: var(--font-headline);
+      font-size: 2.25rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .gauge-big-num.dem { color: var(--dem-blue); }
+    .gauge-big-num.gop { color: var(--gop-red); text-align: right; }
+
+    .gauge-subtext {
+      font-size: 0.75rem;
+      color: var(--on-surface-variant);
+      font-family: var(--font-label);
+    }
+
+    .gauge-center-threshold {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .gauge-threshold-label {
+      font-family: var(--font-label);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: var(--label-tracking);
+      color: var(--on-surface-variant);
+    }
+
+    .gauge-threshold-val {
+      font-family: var(--font-headline);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--on-surface);
+      line-height: 1.1;
+    }
+
+    .gauge-pending-count {
+      font-family: var(--font-label);
+      font-size: 0.72rem;
+      color: var(--pending-gold);
+      font-weight: 600;
+    }
+
+    /* Le rail de la barre proportionnelle */
+    .gauge-bar-track {
+      position: relative;
+      width: 100%;
+      height: 20px;
+      background-color: var(--surface-container-high);
+      border-radius: var(--rounded);
+      overflow: hidden;
+      display: flex;
+      border: 1px solid var(--outline-variant);
+    }
+
+    .gauge-segment {
+      height: 100%;
+      transition: width var(--dur-long) var(--ease-out);
+    }
+
+    .gauge-segment.dem-in-office {
+      background-color: var(--dem-dark);
+      opacity: 0.75;
+    }
+
+    .gauge-segment.dem-won {
+      background-color: var(--dem-blue);
+    }
+
+    .gauge-segment.pending {
+      background-color: var(--pending-gold);
+      background-image: repeating-linear-gradient(
+        -45deg,
+        rgba(255,255,255,0.25),
+        rgba(255,255,255,0.25) 6px,
+        transparent 6px,
+        transparent 12px
+      );
+    }
+
+    .gauge-segment.gop-won {
+      background-color: var(--gop-red);
+    }
+
+    .gauge-segment.gop-in-office {
+      background-color: var(--gop-dark);
+      opacity: 0.75;
+    }
+
+    /* Repère de majorité */
+    .majority-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background-color: var(--outline);
+      transform: translateX(-50%);
+      z-index: 2;
+    }
+
+    .majority-marker::after {
+      content: '';
+      position: absolute;
+      top: -3px;
+      left: -3px;
+      width: 8px;
+      height: 8px;
+      background-color: var(--outline);
+      clip-path: polygon(50% 100%, 0 0, 100% 0);
+    }
+
+    /* 3 Cartes de résumé KPI */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-md);
+    }
+
+    .kpi-card {
+      background-color: var(--surface-container);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--rounded);
+      padding: var(--space-sm) var(--space-md);
+      cursor: pointer;
+      transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .kpi-card:hover {
+      border-color: var(--outline);
+      background-color: var(--surface-container-high);
+      transform: translateY(-1px);
+    }
+
+    .kpi-card.selected-kpi {
+      border-color: var(--primary);
+      background-color: var(--surface-container-low);
+      box-shadow: 0 0 0 1px var(--primary);
+    }
+
+    .kpi-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .kpi-card-title {
+      font-family: var(--font-label);
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: var(--label-tracking);
+      color: var(--on-surface-variant);
+    }
+
+    .kpi-card-status {
+      font-family: var(--font-label);
+      font-size: 0.6875rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: var(--rounded);
+      font-weight: 600;
+    }
+
+    .kpi-card-status.dem {
+      background-color: var(--dem-light);
+      color: var(--dem-dark);
+      border: 1px solid var(--dem-border);
+    }
+
+    .kpi-card-status.gop {
+      background-color: var(--gop-light);
+      color: var(--gop-dark);
+      border: 1px solid var(--gop-border);
+    }
+
+    .kpi-card-status.undecided {
+      background-color: var(--pending-light);
+      color: var(--tertiary);
+      border: 1px solid var(--pending-border);
+    }
+
+    .kpi-card-counts {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-variant-numeric: tabular-nums lining-nums;
+    }
+
+    .kpi-num-left {
+      font-family: var(--font-headline);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--dem-blue);
+    }
+
+    .kpi-num-middle {
+      font-family: var(--font-label);
+      font-size: 0.72rem;
+      color: var(--on-surface-variant);
+    }
+
+    .kpi-num-right {
+      font-family: var(--font-headline);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--gop-red);
+    }
+
+    .kpi-progress-bar {
+      height: 6px;
+      width: 100%;
+      background-color: var(--surface-container-high);
+      border-radius: 3px;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .kpi-subdesc {
+      font-size: 0.75rem;
+      color: var(--on-surface-variant);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Section Carte et Inspecteur d'État */
+    .map-workbench {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    /* Barre d'outils et filtres */
+    .workbench-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-md);
+      background-color: var(--surface-container-low);
+      border: var(--card-border);
+      border-radius: var(--rounded);
+      padding: var(--space-sm) var(--space-md);
+    }
+
+    .view-mode-toggle {
+      display: flex;
+      align-items: center;
+      background-color: var(--surface-container);
+      padding: 2px;
+      border-radius: var(--rounded);
+      border: 1px solid var(--outline-variant);
+    }
+
+    .view-toggle-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      font-family: var(--font-body);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--on-surface-variant);
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--rounded);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      min-height: 34px;
+      transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+    }
+
+    .view-toggle-btn.active {
+      background-color: var(--primary);
+      color: var(--on-primary);
+    }
+
+    .search-filter-box {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      flex: 1;
+      max-width: 320px;
+      position: relative;
+    }
+
+    .search-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 36px;
+      padding: 0 var(--space-md);
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      color: var(--on-surface);
+      background-color: var(--surface-container-low);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--rounded);
+      outline: none;
+      transition: border-color var(--dur-micro) var(--ease-out);
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+    }
+
+    .filter-chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .filter-chip {
+      appearance: none;
+      border: 1px solid var(--outline-variant);
+      background-color: var(--surface-container);
+      color: var(--on-surface-variant);
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.25rem 0.6rem;
+      border-radius: var(--rounded);
+      cursor: pointer;
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
+    }
+
+    .filter-chip:hover {
+      background-color: var(--surface-container-high);
+      color: var(--on-surface);
+    }
+
+    .filter-chip.active {
+      background-color: var(--primary);
+      color: var(--on-primary);
+      border-color: var(--primary);
+    }
+
+    /* Grille principale : Carte + Inspecteur */
+    .map-main-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 380px;
+      gap: var(--space-md);
+      align-items: start;
+    }
+
+    /* Carte interactive */
+    .map-canvas-card {
+      background-color: var(--surface-container-low);
+      border: var(--card-border);
+      border-radius: var(--rounded-lg);
+      padding: var(--space-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      position: relative;
+    }
+
+    .map-canvas-card * {
+      min-width: 0;
+    }
+
+    /* Conteneur explicite pour le visualiseur cartographique */
+    #map-viewport {
+      width: 100%;
+      height: 540px;
+      min-height: 540px;
+      position: relative;
+      background-color: var(--color-white);
+      border-radius: var(--rounded);
+      overflow: hidden;
+      border: 1px solid var(--outline-variant);
+    }
+
+    /* Vue géographique SVG */
+    #geo-svg-container {
+      width: 100%;
+      height: 100%;
+      min-height: 540px;
+      display: block;
+    }
+
+    .state-path {
+      cursor: pointer;
+      stroke: var(--color-white);
+      stroke-width: 1px;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+      transition: stroke-width var(--dur-micro) var(--ease-out), filter var(--dur-micro) var(--ease-out), opacity var(--dur-micro) var(--ease-out);
+    }
+
+    .state-path:hover {
+      stroke: var(--outline);
+      stroke-width: 2px;
+      filter: brightness(0.92);
+      opacity: 1;
+    }
+
+    .state-path.is-selected {
+      stroke: var(--outline);
+      stroke-width: 2.5px;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+    }
+
+    .state-path.dimmed {
+      opacity: 0.3;
+    }
+
+    /* Vue Grille / Cartogramme des sièges */
+    #carto-grid-container {
+      width: 100%;
+      height: 100%;
+      min-height: 540px;
+      display: none;
+      padding: var(--space-md);
+      background-color: var(--color-white);
+      align-content: center;
+      justify-content: center;
+    }
+
+    .carto-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      gap: 6px;
+      width: 100%;
+      max-width: 760px;
+      margin: 0 auto;
+      aspect-ratio: 12 / 8;
+    }
+
+    .carto-cell {
+      aspect-ratio: 1;
+      border-radius: var(--rounded);
+      border: 1px solid var(--outline-variant);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
+      position: relative;
+      user-select: none;
+    }
+
+    .carto-cell:hover {
+      transform: scale(1.08);
+      z-index: 5;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+      border-color: var(--outline);
+    }
+
+    .carto-cell.is-selected {
+      transform: scale(1.12);
+      z-index: 6;
+      border: 2px solid var(--outline);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .carto-cell.dimmed {
+      opacity: 0.25;
+    }
+
+    .carto-code {
+      font-family: var(--font-headline);
+      font-size: 0.85rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .carto-sub {
+      font-family: var(--font-label);
+      font-size: 0.6rem;
+      font-weight: 600;
+      margin-top: 2px;
+      line-height: 1;
+    }
+
+    .carto-flip-dot {
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      width: 6px;
+      height: 6px;
+      background-color: var(--primary-container);
+      border: 1px solid var(--on-surface);
+      border-radius: 1px;
+    }
+
+    /* Couleurs de remplissage */
+    .fill-dem { fill: var(--dem-blue); background-color: var(--dem-blue); color: var(--color-white); }
+    .fill-dem-hold { fill: var(--dem-hold); background-color: var(--dem-hold); color: var(--color-white); }
+    .fill-gop { fill: var(--gop-red); background-color: var(--gop-red); color: var(--color-white); }
+    .fill-gop-hold { fill: var(--gop-hold); background-color: var(--gop-hold); color: var(--color-white); }
+    .fill-pending { fill: var(--pending-gold); background-color: var(--pending-gold); color: var(--on-surface); }
+    .fill-no-race { fill: var(--no-race-fill); background-color: var(--no-race-fill); color: var(--no-race-text); }
+
+    /* Motif hachuré pour sièges basculés (Flipped) */
+    .pattern-flipped-dem {
+      fill: url(#pattern-flip-dem);
+    }
+    .pattern-flipped-gop {
+      fill: url(#pattern-flip-gop);
+    }
+
+    /* Volet des petits États de la côte Est (Northeast Callouts) */
+    .ne-callout-panel {
+      position: absolute;
+      top: var(--space-md);
+      right: var(--space-md);
+      background-color: rgba(255,255,255,0.92);
+      backdrop-filter: blur(4px);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--rounded);
+      padding: var(--space-xs) var(--space-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 10;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    .ne-callout-title {
+      font-family: var(--font-label);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: var(--label-tracking);
+      color: var(--on-surface-variant);
+      font-weight: 600;
+      border-bottom: 1px solid var(--outline-variant);
+      padding-bottom: 2px;
+      margin-bottom: 2px;
+    }
+
+    .ne-pills-grid {
+      display: grid;
+      grid-template-columns: repeat(2, auto);
+      gap: 3px;
+    }
+
+    .ne-pill-btn {
+      appearance: none;
+      border: 1px solid var(--outline-variant);
+      font-family: var(--font-label);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: var(--rounded);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
+      text-align: left;
+    }
+
+    .ne-pill-btn:hover {
+      border-color: var(--outline);
+    }
+
+    .ne-pill-btn.is-active {
+      border: 2px solid var(--outline);
+      box-shadow: 0 0 0 1px var(--outline);
+    }
+
+    .ne-pill-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 1px;
+    }
+
+    /* Légende officielle */
+    .map-legend {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-sm);
+      border-top: 1px solid var(--outline-variant);
+      padding-top: var(--space-sm);
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+    }
+
+    .legend-items-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-md);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      color: var(--on-surface);
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: var(--rounded);
+      border: 1px solid rgba(0,0,0,0.15);
+      flex-shrink: 0;
+    }
+
+    .legend-swatch.dem { background-color: var(--dem-blue); }
+    .legend-swatch.gop { background-color: var(--gop-red); }
+    .legend-swatch.pending { background-color: var(--pending-gold); }
+    .legend-swatch.no-race { background-color: var(--no-race-fill); border-color: var(--no-race-stroke); }
+    .legend-swatch.flipped {
+      background-color: var(--primary-container);
+      border: 1.5px solid var(--outline);
+    }
+
+    .legend-source {
+      font-family: var(--font-label);
+      font-size: 0.7rem;
+      color: var(--on-surface-variant);
+    }
+
+    /* Panneau de détail de l'État (Inspector) */
+    .state-inspector-card {
+      background-color: var(--surface-container-low);
+      border: var(--card-border);
+      border-radius: var(--rounded-lg);
+      padding: var(--space-md);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .inspector-header {
+      border-bottom: var(--section-rule);
+      padding-bottom: var(--space-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .inspector-tagline {
+      font-family: var(--font-label);
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: var(--label-tracking);
+      color: var(--on-surface-variant);
+      font-weight: 600;
+    }
+
+    .inspector-state-name {
+      font-family: var(--font-headline);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--on-surface);
+      line-height: 1.15;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .inspector-postal-code {
+      font-family: var(--font-label);
+      font-size: 0.95rem;
+      color: var(--secondary);
+      font-weight: 600;
+    }
+
+    /* Alertes de bascule de siège */
+    .flip-alert-banner {
+      background-color: var(--primary-container);
+      color: var(--on-primary-container);
+      border: 1px solid var(--outline);
+      border-radius: var(--rounded);
+      padding: var(--space-xs) var(--space-sm);
+      font-size: 0.78rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    /* Boîtes de résultats par scrutin */
+    .races-breakdown {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .race-box {
+      background-color: var(--surface-container);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--rounded);
+      padding: var(--space-sm);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .race-box-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--outline-variant);
+      padding-bottom: 4px;
+    }
+
+    .race-box-title {
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 0.8125rem;
+      color: var(--on-surface);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .race-box-badge {
+      font-family: var(--font-label);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: var(--rounded);
+    }
+
+    .race-box-badge.dem {
+      background-color: var(--dem-light);
+      color: var(--dem-dark);
+      border: 1px solid var(--dem-border);
+    }
+
+    .race-box-badge.gop {
+      background-color: var(--gop-light);
+      color: var(--gop-dark);
+      border: 1px solid var(--gop-border);
+    }
+
+    .race-box-badge.pending {
+      background-color: var(--pending-light);
+      color: var(--tertiary);
+      border: 1px solid var(--pending-border);
+    }
+
+    .race-box-badge.no-race {
+      background-color: var(--surface-container-high);
+      color: var(--on-surface-variant);
+    }
+
+    .candidate-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8125rem;
+      padding: 2px 0;
+    }
+
+    .candidate-name {
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .candidate-party-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 1px;
+    }
+
+    .candidate-party-dot.dem { background-color: var(--dem-blue); }
+    .candidate-party-dot.gop { background-color: var(--gop-red); }
+
+    .candidate-votes {
+      font-family: var(--font-label);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums lining-nums;
+    }
+
+    .reporting-stat {
+      font-family: var(--font-label);
+      font-size: 0.7rem;
+      color: var(--on-surface-variant);
+      display: flex;
+      justify-content: space-between;
+      padding-top: 4px;
+      border-top: 1px dashed var(--outline-variant);
+    }
+
+    /* Chambre des représentants dans l'inspecteur */
+    .house-seats-split {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-family: var(--font-label);
+      font-size: 0.8125rem;
+      font-weight: 600;
+    }
+
+    .house-seat-pill {
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--rounded);
+      flex: 1;
+      text-align: center;
+    }
+
+    .house-seat-pill.dem {
+      background-color: var(--dem-light);
+      color: var(--dem-dark);
+      border: 1px solid var(--dem-border);
+    }
+
+    .house-seat-pill.gop {
+      background-color: var(--gop-light);
+      color: var(--gop-dark);
+      border: 1px solid var(--gop-border);
+    }
+
+    /* Vue par défaut de l'inspecteur : Swing States clés */
+    .battlegrounds-quicklist {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .battleground-btn {
+      appearance: none;
+      border: 1px solid var(--outline-variant);
+      background-color: var(--surface-container);
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--rounded);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
+      font-family: var(--font-body);
+      min-height: 40px;
+    }
+
+    .battleground-btn:hover {
+      background-color: var(--surface-container-high);
+      border-color: var(--outline);
+    }
+
+    .battleground-btn-name {
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--on-surface);
+    }
+
+    .battleground-btn-meta {
+      font-family: var(--font-label);
+      font-size: 0.72rem;
+      color: var(--on-surface-variant);
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    /* Tooltip flottant */
+    .map-tooltip {
+      position: absolute;
+      pointer-events: none;
+      background-color: var(--on-surface);
+      color: var(--color-white);
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--rounded);
+      font-size: 0.78rem;
+      font-family: var(--font-body);
+      line-height: 1.3;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+      display: none;
+      max-width: 220px;
+    }
+
+    .tooltip-title {
+      font-weight: 700;
+      font-size: 0.85rem;
+      border-bottom: 1px solid rgba(255,255,255,0.25);
+      padding-bottom: 2px;
+      margin-bottom: 4px;
+    }
+
+    .tooltip-row {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-sm);
+      font-family: var(--font-label);
+      font-size: 0.72rem;
+    }
+
+    /* Bouton Réinitialiser sélection */
+    .reset-selection-btn {
+      appearance: none;
+      border: 1px solid var(--outline-variant);
+      background-color: transparent;
+      color: var(--on-surface-variant);
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: var(--rounded);
+      cursor: pointer;
+      margin-top: var(--space-xs);
+      transition: background-color var(--dur-micro) var(--ease-out);
+      align-self: flex-start;
+    }
+
+    .reset-selection-btn:hover {
+      background-color: var(--surface-container-high);
+      color: var(--on-surface);
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .map-main-layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .state-inspector-card {
+        order: 2;
+      }
+      .map-canvas-card {
+        order: 1;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .kpi-row {
+        grid-template-columns: 1fr;
+      }
+      .workbench-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .search-filter-box {
+        max-width: 100%;
+      }
+      #map-viewport {
+        height: 420px;
+        min-height: 420px;
+      }
+      #geo-svg-container {
+        min-height: 420px;
+      }
+      .ne-callout-panel {
+        position: static;
+        margin-top: var(--space-sm);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .dashboard-app {
+        padding: var(--space-sm);
+        gap: var(--space-md);
+      }
+      .masthead-title {
+        font-size: 1.6rem;
+      }
+      .gauge-big-num {
+        font-size: 1.8rem;
+      }
+      .carto-grid {
+        gap: 3px;
+      }
+      .carto-code {
+        font-size: 0.7rem;
+      }
+      .carto-sub {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="dashboard-app">
+
+    <!-- En-tête / Masthead -->
+    <header class="masthead">
+      <div class="masthead-top">
+        <div class="dossier-pill-group">
+          <span class="dossier-pill">DOSSIER SPÉCIAL</span>
+          <span class="status-badge">MIDTERMS 2026 • DÉPOUILLEMENT EN COURS</span>
+        </div>
+        <div class="masthead-meta">
+          Mise à jour : 5 nov. 2026 à 12h40 EST • Source : Associated Press
+        </div>
+      </div>
+      <h1 class="masthead-title">Élections de mi-mandat aux États-Unis</h1>
+      <p class="masthead-subhead">
+        Tableau de bord synthétique du rapport de force institutionnel et carte interactive des résultats par État pour le Sénat, la Chambre des représentants et les Gouvernorats.
+      </p>
+    </header>
+
+    <!-- Tableau de bord synthétique du rapport de force (Balance of Power) -->
+    <section class="balance-section" aria-label="Rapport de force national">
+      <div class="balance-header">
+        <div class="race-tabs" role="tablist" aria-label="Sélection du scrutin">
+          <button type="button" class="race-tab-btn active" id="tab-senate" role="tab" aria-selected="true" onclick="selectRace('senate')">
+            Sénat (100 sièges)
+          </button>
+          <button type="button" class="race-tab-btn" id="tab-house" role="tab" aria-selected="false" onclick="selectRace('house')">
+            Chambre (435 sièges)
+          </button>
+          <button type="button" class="race-tab-btn" id="tab-governor" role="tab" aria-selected="false" onclick="selectRace('governor')">
+            Gouverneurs (50 postes)
+          </button>
+        </div>
+        <div class="active-race-info">
+          <span>Seuil de majorité :</span>
+          <span class="majority-badge" id="majority-threshold-text">50 sièges</span>
+        </div>
+      </div>
+
+      <!-- Jauge principale du scrutin actif -->
+      <div class="gauge-wrapper">
+        <div class="gauge-numbers">
+          <div class="gauge-side">
+            <span class="gauge-party-name dem">Démocrates</span>
+            <span class="gauge-big-num dem" id="gauge-dem-count">54</span>
+            <span class="gauge-subtext" id="gauge-dem-subtext">34 en fonction • 20 élus</span>
+          </div>
+
+          <div class="gauge-center-threshold">
+            <span class="gauge-threshold-label">Majorité</span>
+            <span class="gauge-threshold-val" id="gauge-threshold-val">50</span>
+            <span class="gauge-pending-count" id="gauge-pending-text">2 en attente</span>
+          </div>
+
+          <div class="gauge-side">
+            <span class="gauge-party-name gop">Républicains</span>
+            <span class="gauge-big-num gop" id="gauge-gop-count">44</span>
+            <span class="gauge-subtext" id="gauge-gop-subtext">31 en fonction • 13 élus</span>
+          </div>
+        </div>
+
+        <!-- Rail proportionnel -->
+        <div class="gauge-bar-track" id="gauge-track" aria-label="Progression des sièges">
+          <div class="gauge-segment dem-in-office" id="bar-dem-in-office" style="width: 34%;" title="Démocrates en fonction (non renouvelés)"></div>
+          <div class="gauge-segment dem-won" id="bar-dem-won" style="width: 20%;" title="Démocrates élus en 2026"></div>
+          <div class="gauge-segment pending" id="bar-pending" style="width: 2%;" title="Scrutins en cours de dépouillement"></div>
+          <div class="gauge-segment gop-won" id="bar-gop-won" style="width: 13%;" title="Républicains élus en 2026"></div>
+          <div class="gauge-segment gop-in-office" id="bar-gop-in-office" style="width: 31%;" title="Républicains en fonction (non renouvelés)"></div>
+          <div class="majority-marker" id="gauge-majority-marker" style="left: 50%;" title="Ligne de majorité absolue"></div>
+        </div>
+      </div>
+
+      <!-- 3 Cartes de synthèse comparatives -->
+      <div class="kpi-row">
+        <!-- Carte Sénat -->
+        <div class="kpi-card selected-kpi" id="kpi-senate" onclick="selectRace('senate')" role="button" tabindex="0">
+          <div class="kpi-card-header">
+            <span class="kpi-card-title">Sénat fédéral</span>
+            <span class="kpi-card-status dem">Majorité Démocrate</span>
+          </div>
+          <div class="kpi-card-counts">
+            <span class="kpi-num-left">54 D</span>
+            <span class="kpi-num-middle">2 en cours</span>
+            <span class="kpi-num-right">44 R</span>
+          </div>
+          <div class="kpi-progress-bar">
+            <div style="width: 54%; background-color: var(--dem-blue);"></div>
+            <div style="width: 2%; background-color: var(--pending-gold);"></div>
+            <div style="width: 44%; background-color: var(--gop-red);"></div>
+          </div>
+          <div class="kpi-subdesc">
+            <span>Seuil : 50</span>
+            <span>+3 gains nets D</span>
+          </div>
+        </div>
+
+        <!-- Carte Chambre -->
+        <div class="kpi-card" id="kpi-house" onclick="selectRace('house')" role="button" tabindex="0">
+          <div class="kpi-card-header">
+            <span class="kpi-card-title">Chambre des représentants</span>
+            <span class="kpi-card-status dem">Majorité Démocrate</span>
+          </div>
+          <div class="kpi-card-counts">
+            <span class="kpi-num-left">251 D</span>
+            <span class="kpi-num-middle">29 en cours</span>
+            <span class="kpi-num-right">155 R</span>
+          </div>
+          <div class="kpi-progress-bar">
+            <div style="width: 57.7%; background-color: var(--dem-blue);"></div>
+            <div style="width: 6.7%; background-color: var(--pending-gold);"></div>
+            <div style="width: 35.6%; background-color: var(--gop-red);"></div>
+          </div>
+          <div class="kpi-subdesc">
+            <span>Seuil : 218</span>
+            <span>218 sièges franchis</span>
+          </div>
+        </div>
+
+        <!-- Carte Gouverneurs -->
+        <div class="kpi-card" id="kpi-governor" onclick="selectRace('governor')" role="button" tabindex="0">
+          <div class="kpi-card-header">
+            <span class="kpi-card-title">Gouvernorats des États</span>
+            <span class="kpi-card-status dem">Avance Démocrate</span>
+          </div>
+          <div class="kpi-card-counts">
+            <span class="kpi-num-left">28 D</span>
+            <span class="kpi-num-middle">2 en cours</span>
+            <span class="kpi-num-right">20 R</span>
+          </div>
+          <div class="kpi-progress-bar">
+            <div style="width: 56%; background-color: var(--dem-blue);"></div>
+            <div style="width: 4%; background-color: var(--pending-gold);"></div>
+            <div style="width: 40%; background-color: var(--gop-red);"></div>
+          </div>
+          <div class="kpi-subdesc">
+            <span>Seuil : 26</span>
+            <span>36 postes renouvelés</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Zone opérationnelle de la carte et du détail -->
+    <main class="map-workbench">
+
+      <!-- Barre d'outils, bascule de vue et filtres -->
+      <div class="workbench-toolbar">
+        <!-- Bascule Géographique vs Grille de sièges (Cartogramme) -->
+        <div class="view-mode-toggle" role="group" aria-label="Format d'affichage de la carte">
+          <button type="button" class="view-toggle-btn active" id="btn-view-geo" onclick="switchView('geo')">
+            <span>Carte géographique</span>
+          </button>
+          <button type="button" class="view-toggle-btn" id="btn-view-carto" onclick="switchView('carto')">
+            <span>Grille des sièges</span>
+          </button>
+        </div>
+
+        <!-- Recherche instantanée d'État -->
+        <div class="search-filter-box">
+          <label for="state-search-input" class="search-label">Rechercher un État</label>
+          <input type="text" id="state-search-input" class="search-input" placeholder="Rechercher un État (ex: PA, Texas, Géorgie)..." oninput="handleSearch(this.value)">
+        </div>
+
+        <!-- Filtres rapides de statut -->
+        <div class="filter-chips-row" role="group" aria-label="Filtrer les États">
+          <button type="button" class="filter-chip active" id="filter-all" onclick="applyFilter('all')">Tous</button>
+          <button type="button" class="filter-chip" id="filter-dem" onclick="applyFilter('dem')">Démocrates</button>
+          <button type="button" class="filter-chip" id="filter-gop" onclick="applyFilter('gop')">Républicains</button>
+          <button type="button" class="filter-chip" id="filter-flipped" onclick="applyFilter('flipped')">Sièges basculés</button>
+          <button type="button" class="filter-chip" id="filter-pending" onclick="applyFilter('pending')">Non proclamés</button>
+        </div>
+      </div>
+
+      <!-- Disposition principale : Carte interactive + Panneau d'inspection -->
+      <div class="map-main-layout">
+
+        <!-- Carte interactive -->
+        <div class="map-canvas-card">
+          <div id="map-viewport">
+            <!-- Vue 1: Carte SVG géographique -->
+            <svg id="geo-svg-container" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <!-- Hachures Démocrate pour siège basculé -->
+                <pattern id="pattern-flip-dem" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <rect width="8" height="8" fill="var(--dem-blue)" />
+                  <line x1="0" y1="0" x2="0" y2="8" stroke="var(--color-white)" stroke-width="2.5" />
+                </pattern>
+                <!-- Hachures Républicain pour siège basculé -->
+                <pattern id="pattern-flip-gop" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <rect width="8" height="8" fill="var(--gop-red)" />
+                  <line x1="0" y1="0" x2="0" y2="8" stroke="var(--color-white)" stroke-width="2.5" />
+                </pattern>
+              </defs>
+              <g id="states-group"></g>
+            </svg>
+
+            <!-- Vue 2: Grille / Cartogramme des sièges -->
+            <div id="carto-grid-container">
+              <div class="carto-grid" id="carto-tiles"></div>
+            </div>
+
+            <!-- Volet des petits États de la côte Est (Northeast Callouts) -->
+            <div class="ne-callout-panel" id="ne-panel" aria-label="Sélection rapide des petits États de l'Est">
+              <div class="ne-callout-title">Côte Est & Petits États</div>
+              <div class="ne-pills-grid" id="ne-pills-container"></div>
+            </div>
+          </div>
+
+          <!-- Légende officielle -->
+          <div class="map-legend">
+            <div class="legend-items-group">
+              <div class="legend-item">
+                <span class="legend-swatch dem"></span>
+                <span>Démocrate (Gagné / En tête)</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-swatch gop"></span>
+                <span>Républicain (Gagné / En tête)</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-swatch no-race"></span>
+                <span>Siège non renouvelé en 2026</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-swatch pending"></span>
+                <span>Scrutin non proclamé / En cours</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-swatch flipped"></span>
+                <span>Siège basculé (Gain de parti)</span>
+              </div>
+            </div>
+            <div class="legend-source">
+              Données AP Elections • 5 nov. 2026
+            </div>
+          </div>
+        </div>
+
+        <!-- Panneau de détail de l'État (Inspector) -->
+        <aside class="state-inspector-card" aria-label="Détail des résultats par État">
+          <div class="inspector-header">
+            <span class="inspector-tagline" id="inspector-tagline">Fiche synthétique de l'État</span>
+            <div class="inspector-state-name">
+              <span id="inspector-name">Vue d'ensemble nationale</span>
+              <span class="inspector-postal-code" id="inspector-abbr">—</span>
+            </div>
+          </div>
+
+          <!-- Bannière d'alerte en cas de bascule -->
+          <div class="flip-alert-banner" id="flip-alert-box" style="display: none;">
+            <span>★</span>
+            <span id="flip-alert-text">Siège basculé lors de ce scrutin</span>
+          </div>
+
+          <!-- Conteneur dynamique des résultats pour l'État sélectionné -->
+          <div class="races-breakdown" id="inspector-content">
+            <!-- Rempli dynamiquement en JS -->
+          </div>
+
+          <!-- Bouton Réinitialiser la sélection -->
+          <button type="button" class="reset-selection-btn" id="btn-reset-selection" onclick="resetStateSelection()" style="display: none;">
+            ← Revenir à la vue d'ensemble nationale
+          </button>
+        </aside>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Infobulle flottante (Tooltip) -->
+  <div class="map-tooltip" id="map-tooltip" role="tooltip"></div>
+
+  <!-- Données électorales et script interactif -->
+  <script>
+    /* ==========================================================================
+       1. Base de données des 50 États + DC (Élections de mi-mandat 2026)
+       Conforme aux chiffres AP :
+       - Sénat: 54D, 44R, 2 en attente (34 Dem en fonction, 31 Rep en fonction)
+       - Chambre: 251D, 155R, 29 en attente
+       - Gouverneurs: 28D, 20R, 2 en attente
+       ========================================================================== */
+    const STATES_DATA = {
+      'AL': { name: 'Alabama', fips: '01', senate: { up: true, winner: 'R', candD: 'Fisher (D)', pctD: '38.2%', candR: 'Tuberville (R)', pctR: '60.9%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 1, gop: 6, pending: 0, total: 7 }, gov: { up: true, winner: 'R', candD: 'Flowers (D)', pctD: '36.4%', candR: 'Ivey (R)', pctR: '62.7%', flipped: false, status: 'gop', reporting: '99%' } },
+      'AK': { name: 'Alaska', fips: '02', senate: { up: true, winner: null, candD: 'Gross (D)', pctD: '48.9%', candR: 'Sullivan (R)', pctR: '49.8%', flipped: false, status: 'pending', reporting: '88%' }, house: { dem: 1, gop: 0, pending: 0, total: 1 }, gov: { up: true, winner: 'R', candD: 'Gara (D)', pctD: '44.2%', candR: 'Dunleavy (R)', pctR: '52.1%', flipped: false, status: 'gop', reporting: '92%' } },
+      'AZ': { name: 'Arizona', fips: '04', senate: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Siège non renouvelé en 2026' }, house: { dem: 6, gop: 3, pending: 0, total: 9 }, gov: { up: true, winner: null, candD: 'Hobbs (D)', pctD: '50.1%', candR: 'Lake (R)', pctR: '49.4%', flipped: false, status: 'pending', reporting: '91%' } },
+      'AR': { name: 'Arkansas', fips: '05', senate: { up: true, winner: 'R', candD: 'Harrington (D)', pctD: '33.5%', candR: 'Cotton (R)', pctR: '64.8%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 0, gop: 4, pending: 0, total: 4 }, gov: { up: true, winner: 'R', candD: 'Jones (D)', pctD: '35.2%', candR: 'Sanders (R)', pctR: '63.1%', flipped: false, status: 'gop', reporting: '99%' } },
+      'CA': { name: 'Californie', fips: '06', senate: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Siège non renouvelé en 2026' }, house: { dem: 41, gop: 9, pending: 2, total: 52 }, gov: { up: true, winner: 'D', candD: 'Kounalakis (D)', pctD: '58.4%', candR: 'Dahle (R)', pctR: '41.6%', flipped: false, status: 'dem', reporting: '92%' } },
+      'CO': { name: 'Colorado', fips: '08', senate: { up: true, winner: 'D', candD: 'Hickenlooper (D)', pctD: '55.6%', candR: 'O\'Dea (R)', pctR: '42.1%', flipped: false, status: 'dem', reporting: '98%' }, house: { dem: 5, gop: 3, pending: 0, total: 8 }, gov: { up: true, winner: 'D', candD: 'Polis (D)', pctD: '57.8%', candR: 'Ganahl (R)', pctR: '40.2%', flipped: false, status: 'dem', reporting: '98%' } },
+      'CT': { name: 'Connecticut', fips: '09', senate: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Siège non renouvelé en 2026' }, house: { dem: 5, gop: 0, pending: 0, total: 5 }, gov: { up: true, winner: 'D', candD: 'Lamont (D)', pctD: '56.2%', candR: 'Stefanowski (R)', pctR: '42.8%', flipped: false, status: 'dem', reporting: '99%' } },
+      'DE': { name: 'Delaware', fips: '10', senate: { up: true, winner: 'D', candD: 'Coons (D)', pctD: '61.4%', candR: 'Witzke (R)', pctR: '37.1%', flipped: false, status: 'dem', reporting: '99%' }, house: { dem: 1, gop: 0, pending: 0, total: 1 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Pas de scrutin gouverneur en 2026' } },
+      'FL': { name: 'Floride', fips: '12', senate: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Siège non renouvelé en 2026' }, house: { dem: 9, gop: 18, pending: 1, total: 28 }, gov: { up: true, winner: 'R', candD: 'Fried (D)', pctD: '45.1%', candR: 'Moody (R)', pctR: '53.9%', flipped: false, status: 'gop', reporting: '99%' } },
+      'GA': { name: 'Géorgie', fips: '13', senate: { up: true, winner: 'D', candD: 'Ossoff (D)', pctD: '51.3%', candR: 'Walker (R)', pctR: '47.6%', flipped: false, status: 'dem', reporting: '99%' }, house: { dem: 6, gop: 8, pending: 0, total: 14 }, gov: { up: true, winner: 'D', candD: 'Abrams (D)', pctD: '50.7%', candR: 'Jones (R)', pctR: '48.4%', flipped: true, status: 'dem', reporting: '98%' } },
+      'HI': { name: 'Hawaï', fips: '15', senate: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Siège non renouvelé en 2026' }, house: { dem: 2, gop: 0, pending: 0, total: 2 }, gov: { up: true, winner: 'D', candD: 'Green (D)', pctD: '63.2%', candR: 'Aiona (R)', pctR: '35.4%', flipped: false, status: 'dem', reporting: '96%' } },
+      'ID': { name: 'Idaho', fips: '16', senate: { up: true, winner: 'R', candD: 'Roth (D)', pctD: '33.1%', candR: 'Risch (R)', pctR: '64.5%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 0, gop: 2, pending: 0, total: 2 }, gov: { up: true, winner: 'R', candD: 'Heichman (D)', pctD: '31.8%', candR: 'Little (R)', pctR: '65.2%', flipped: false, status: 'gop', reporting: '99%' } },
+      'IL': { name: 'Illinois', fips: '17', senate: { up: true, winner: 'D', candD: 'Durbin (D)', pctD: '57.4%', candR: 'Curran (R)', pctR: '40.6%', flipped: false, status: 'dem', reporting: '98%' }, house: { dem: 14, gop: 3, pending: 0, total: 17 }, gov: { up: true, winner: 'D', candD: 'Pritzker (D)', pctD: '55.9%', candR: 'Bailey (R)', pctR: '42.1%', flipped: false, status: 'dem', reporting: '98%' } },
+      'IN': { name: 'Indiana', fips: '18', senate: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Siège non renouvelé en 2026' }, house: { dem: 2, gop: 7, pending: 0, total: 9 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Pas de scrutin gouverneur en 2026' } },
+      'IA': { name: 'Iowa', fips: '19', senate: { up: true, winner: 'R', candD: 'Franken (D)', pctD: '44.8%', candR: 'Ernst (R)', pctR: '53.6%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 1, gop: 3, pending: 0, total: 4 }, gov: { up: true, winner: 'R', candD: 'DeJear (D)', pctD: '42.3%', candR: 'Reynolds (R)', pctR: '56.1%', flipped: false, status: 'gop', reporting: '99%' } },
+      'KS': { name: 'Kansas', fips: '20', senate: { up: true, winner: 'R', candD: 'Bollier (D)', pctD: '43.2%', candR: 'Marshall (R)', pctR: '54.5%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 1, gop: 3, pending: 0, total: 4 }, gov: { up: true, winner: 'D', candD: 'Kelly (D)', pctD: '51.1%', candR: 'Schmidt (R)', pctR: '46.7%', flipped: false, status: 'dem', reporting: '98%' } },
+      'KY': { name: 'Kentucky', fips: '21', senate: { up: true, winner: 'R', candD: 'McGrath (D)', pctD: '40.1%', candR: 'McConnell (R)', pctR: '57.8%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 1, gop: 5, pending: 0, total: 6 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Scrutin en 2027 (hors cycle)' } },
+      'LA': { name: 'Louisiane', fips: '22', senate: { up: true, winner: 'R', candD: 'Edwards (D)', pctD: '41.2%', candR: 'Cassidy (R)', pctR: '57.1%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 2, gop: 4, pending: 0, total: 6 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Scrutin en 2027 (hors cycle)' } },
+      'ME': { name: 'Maine', fips: '23', senate: { up: true, winner: 'R', candD: 'Gideon (D)', pctD: '47.5%', candR: 'Collins (R)', pctR: '51.1%', flipped: true, status: 'gop', reporting: '99%' }, house: { dem: 2, gop: 0, pending: 0, total: 2 }, gov: { up: true, winner: 'D', candD: 'Mills (D)', pctD: '54.8%', candR: 'LePage (R)', pctR: '43.9%', flipped: false, status: 'dem', reporting: '98%' } },
+      'MD': { name: 'Maryland', fips: '24', senate: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Siège non renouvelé en 2026' }, house: { dem: 7, gop: 1, pending: 0, total: 8 }, gov: { up: true, winner: 'D', candD: 'Moore (D)', pctD: '64.5%', candR: 'Cox (R)', pctR: '33.2%', flipped: false, status: 'dem', reporting: '98%' } },
+      'MA': { name: 'Massachusetts', fips: '25', senate: { up: true, winner: 'D', candD: 'Markey (D)', pctD: '66.2%', candR: 'O\'Connor (R)', pctR: '33.1%', flipped: false, status: 'dem', reporting: '99%' }, house: { dem: 9, gop: 0, pending: 0, total: 9 }, gov: { up: true, winner: 'D', candD: 'Healey (D)', pctD: '63.9%', candR: 'Diehl (R)', pctR: '34.5%', flipped: false, status: 'dem', reporting: '99%' } },
+      'MI': { name: 'Michigan', fips: '26', senate: { up: true, winner: 'D', candD: 'Peters (D)', pctD: '52.1%', candR: 'James (R)', pctR: '46.7%', flipped: false, status: 'dem', reporting: '98%' }, house: { dem: 8, gop: 5, pending: 0, total: 13 }, gov: { up: true, winner: 'D', candD: 'Whitmer (D)', pctD: '54.5%', candR: 'Dixon (R)', pctR: '43.9%', flipped: false, status: 'dem', reporting: '98%' } },
+      'MN': { name: 'Minnesota', fips: '27', senate: { up: true, winner: 'D', candD: 'Smith (D)', pctD: '53.4%', candR: 'Lewis (R)', pctR: '44.2%', flipped: false, status: 'dem', reporting: '99%' }, house: { dem: 5, gop: 3, pending: 0, total: 8 }, gov: { up: true, winner: 'D', candD: 'Walz (D)', pctD: '53.1%', candR: 'Jensen (R)', pctR: '44.8%', flipped: false, status: 'dem', reporting: '99%' } },
+      'MS': { name: 'Mississippi', fips: '28', senate: { up: true, winner: 'R', candD: 'Espy (D)', pctD: '43.9%', candR: 'Hyde-Smith (R)', pctR: '54.7%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 1, gop: 3, pending: 0, total: 4 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Scrutin en 2027 (hors cycle)' } },
+      'MO': { name: 'Missouri', fips: '29', senate: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Siège non renouvelé en 2026' }, house: { dem: 2, gop: 6, pending: 0, total: 8 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Pas de scrutin gouverneur en 2026' } },
+      'MT': { name: 'Montana', fips: '30', senate: { up: true, winner: 'R', candD: 'Bullock (D)', pctD: '46.8%', candR: 'Daines (R)', pctR: '52.4%', flipped: false, status: 'gop', reporting: '98%' }, house: { dem: 0, gop: 2, pending: 0, total: 2 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Pas de scrutin gouverneur en 2026' } },
+      'NE': { name: 'Nebraska', fips: '31', senate: { up: true, winner: 'R', candD: 'Janicek (D)', pctD: '32.4%', candR: 'Sasse (R)', pctR: '63.7%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 1, gop: 2, pending: 0, total: 3 }, gov: { up: true, winner: 'R', candD: 'Blood (D)', pctD: '35.1%', candR: 'Pillen (R)', pctR: '61.2%', flipped: false, status: 'gop', reporting: '99%' } },
+      'NV': { name: 'Nevada', fips: '32', senate: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Siège non renouvelé en 2026' }, house: { dem: 3, gop: 1, pending: 0, total: 4 }, gov: { up: true, winner: null, candD: 'Sisolak (D)', pctD: '49.8%', candR: 'Lombardo (R)', pctR: '49.6%', flipped: false, status: 'pending', reporting: '90%' } },
+      'NH': { name: 'New Hampshire', fips: '33', senate: { up: true, winner: 'D', candD: 'Shaheen (D)', pctD: '56.6%', candR: 'Messner (R)', pctR: '41.0%', flipped: false, status: 'dem', reporting: '99%' }, house: { dem: 2, gop: 0, pending: 0, total: 2 }, gov: { up: true, winner: 'D', candD: 'Sherman (D)', pctD: '51.4%', candR: 'Sununu (R)', pctR: '47.8%', flipped: true, status: 'dem', reporting: '99%' } },
+      'NJ': { name: 'New Jersey', fips: '34', senate: { up: true, winner: 'D', candD: 'Booker (D)', pctD: '58.2%', candR: 'Mehta (R)', pctR: '40.1%', flipped: false, status: 'dem', reporting: '99%' }, house: { dem: 9, gop: 3, pending: 0, total: 12 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Scrutin gouverneur en 2025' } },
+      'NM': { name: 'Nouveau-Mexique', fips: '35', senate: { up: true, winner: 'D', candD: 'Luján (D)', pctD: '53.1%', candR: 'Ronchetti (R)', pctR: '44.8%', flipped: false, status: 'dem', reporting: '98%' }, house: { dem: 3, gop: 0, pending: 0, total: 3 }, gov: { up: true, winner: 'D', candD: 'Grisham (D)', pctD: '52.6%', candR: 'Ronchetti (R)', pctR: '45.9%', flipped: false, status: 'dem', reporting: '98%' } },
+      'NY': { name: 'New York', fips: '36', senate: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Siège non renouvelé en 2026' }, house: { dem: 20, gop: 5, pending: 1, total: 26 }, gov: { up: true, winner: 'D', candD: 'Hochul (D)', pctD: '54.1%', candR: 'Zeldin (R)', pctR: '45.2%', flipped: false, status: 'dem', reporting: '96%' } },
+      'NC': { name: 'Caroline du Nord', fips: '37', senate: { up: true, winner: null, candD: 'Cunningham (D)', pctD: '49.1%', candR: 'Tillis (R)', pctR: '49.4%', flipped: false, status: 'pending', reporting: '94%' }, house: { dem: 7, gop: 7, pending: 0, total: 14 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Pas de scrutin gouverneur en 2026' } },
+      'ND': { name: 'Dakota du Nord', fips: '38', senate: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Siège non renouvelé en 2026' }, house: { dem: 0, gop: 1, pending: 0, total: 1 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Pas de scrutin gouverneur en 2026' } },
+      'OH': { name: 'Ohio', fips: '39', senate: { up: true, winner: 'D', candD: 'Brown (D)', pctD: '51.8%', candR: 'Moreno (R)', pctR: '47.2%', flipped: true, status: 'dem', reporting: '99%' }, house: { dem: 6, gop: 9, pending: 0, total: 15 }, gov: { up: true, winner: 'R', candD: 'Whaley (D)', pctD: '43.1%', candR: 'DeWine (R)', pctR: '55.9%', flipped: false, status: 'gop', reporting: '99%' } },
+      'OK': { name: 'Oklahoma', fips: '40', senate: { up: true, winner: 'R', candD: 'Broyles (D)', pctD: '34.2%', candR: 'Inhofe (R)', pctR: '62.9%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 0, gop: 5, pending: 0, total: 5 }, gov: { up: true, winner: 'R', candD: 'Hofmeister (D)', pctD: '41.8%', candR: 'Stitt (R)', pctR: '55.4%', flipped: false, status: 'gop', reporting: '99%' } },
+      'OR': { name: 'Oregon', fips: '41', senate: { up: true, winner: 'D', candD: 'Merkley (D)', pctD: '58.7%', candR: 'Perkins (R)', pctR: '38.6%', flipped: false, status: 'dem', reporting: '96%' }, house: { dem: 5, gop: 1, pending: 0, total: 6 }, gov: { up: true, winner: 'D', candD: 'Kotek (D)', pctD: '48.9%', candR: 'Drazan (R)', pctR: '44.3%', flipped: false, status: 'dem', reporting: '97%' } },
+      'PA': { name: 'Pennsylvanie', fips: '42', senate: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Siège non renouvelé en 2026' }, house: { dem: 10, gop: 7, pending: 0, total: 17 }, gov: { up: true, winner: 'D', candD: 'Shapiro (D)', pctD: '56.9%', candR: 'Mastriano (R)', pctR: '41.7%', flipped: false, status: 'dem', reporting: '99%' } },
+      'RI': { name: 'Rhode Island', fips: '44', senate: { up: true, winner: 'D', candD: 'Reed (D)', pctD: '66.5%', candR: 'Waters (R)', pctR: '33.2%', flipped: false, status: 'dem', reporting: '99%' }, house: { dem: 2, gop: 0, pending: 0, total: 2 }, gov: { up: true, winner: 'D', candD: 'McKee (D)', pctD: '58.1%', candR: 'Kalus (R)', pctR: '39.8%', flipped: false, status: 'dem', reporting: '99%' } },
+      'SC': { name: 'Caroline du Sud', fips: '45', senate: { up: true, winner: 'R', candD: 'Harrison (D)', pctD: '44.2%', candR: 'Graham (R)', pctR: '54.5%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 1, gop: 6, pending: 0, total: 7 }, gov: { up: true, winner: 'R', candD: 'Smith (D)', pctD: '40.6%', candR: 'McMaster (R)', pctR: '58.1%', flipped: false, status: 'gop', reporting: '99%' } },
+      'SD': { name: 'Dakota du Sud', fips: '46', senate: { up: true, winner: 'R', candD: 'Ahlers (D)', pctD: '34.5%', candR: 'Rounds (R)', pctR: '65.2%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 0, gop: 1, pending: 0, total: 1 }, gov: { up: true, winner: 'R', candD: 'Smith (D)', pctD: '36.8%', candR: 'Noem (R)', pctR: '61.9%', flipped: false, status: 'gop', reporting: '99%' } },
+      'TN': { name: 'Tennessee', fips: '47', senate: { up: true, winner: 'R', candD: 'Bradshaw (D)', pctD: '35.4%', candR: 'Hagerty (R)', pctR: '62.2%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 1, gop: 8, pending: 0, total: 9 }, gov: { up: true, winner: 'R', candD: 'Martin (D)', pctD: '34.1%', candR: 'Lee (R)', pctR: '64.9%', flipped: false, status: 'gop', reporting: '99%' } },
+      'TX': { name: 'Texas', fips: '48', senate: { up: true, winner: 'D', candD: 'Allred (D)', pctD: '50.6%', candR: 'Cornyn (R)', pctR: '48.1%', flipped: true, status: 'dem', reporting: '98%' }, house: { dem: 15, gop: 21, pending: 2, total: 38 }, gov: { up: true, winner: 'R', candD: 'O\'Rourke (D)', pctD: '46.4%', candR: 'Abbott (R)', pctR: '52.7%', flipped: false, status: 'gop', reporting: '98%' } },
+      'UT': { name: 'Utah', fips: '49', senate: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Siège non renouvelé en 2026' }, house: { dem: 0, gop: 4, pending: 0, total: 4 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Pas de scrutin gouverneur en 2026' } },
+      'VT': { name: 'Vermont', fips: '50', senate: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Siège non renouvelé en 2026' }, house: { dem: 1, gop: 0, pending: 0, total: 1 }, gov: { up: true, winner: 'D', candD: 'Siegel (D)', pctD: '52.7%', candR: 'Scott (R)', pctR: '46.2%', flipped: true, status: 'dem', reporting: '99%' } },
+      'VA': { name: 'Virginie', fips: '51', senate: { up: true, winner: 'D', candD: 'Warner (D)', pctD: '56.1%', candR: 'Gade (R)', pctR: '43.7%', flipped: false, status: 'dem', reporting: '99%' }, house: { dem: 7, gop: 4, pending: 0, total: 11 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Scrutin gouverneur en 2025' } },
+      'WA': { name: 'Washington', fips: '53', senate: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Siège non renouvelé en 2026' }, house: { dem: 8, gop: 2, pending: 0, total: 10 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Pas de scrutin gouverneur en 2026' } },
+      'WV': { name: 'Virginie-Occidentale', fips: '54', senate: { up: true, winner: 'R', candD: 'Swearengin (D)', pctD: '28.5%', candR: 'Capito (R)', pctR: '70.2%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 0, gop: 2, pending: 0, total: 2 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'R', note: 'Pas de scrutin gouverneur en 2026' } },
+      'WI': { name: 'Wisconsin', fips: '55', senate: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Siège non renouvelé en 2026' }, house: { dem: 3, gop: 5, pending: 0, total: 8 }, gov: { up: true, winner: 'D', candD: 'Evers (D)', pctD: '51.2%', candR: 'Michels (R)', pctR: '47.8%', flipped: false, status: 'dem', reporting: '99%' } },
+      'WY': { name: 'Wyoming', fips: '56', senate: { up: true, winner: 'R', candD: 'Ben-David (D)', pctD: '27.4%', candR: 'Lummis (R)', pctR: '72.3%', flipped: false, status: 'gop', reporting: '99%' }, house: { dem: 0, gop: 1, pending: 0, total: 1 }, gov: { up: true, winner: 'R', candD: 'Livingston (D)', pctD: '26.8%', candR: 'Gordon (R)', pctR: '71.5%', flipped: false, status: 'gop', reporting: '99%' } },
+      'DC': { name: 'District de Columbia', fips: '11', senate: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Sans représentation au Sénat' }, house: { dem: 1, gop: 0, pending: 0, total: 1 }, gov: { up: false, winner: null, status: 'no_race', incumbent: 'D', note: 'Mairie de DC' } }
+    };
+
+    /* Disposition cartogramme en grille 12 x 8 (coordonnées standard cartogramme US) */
+    const CARTO_COORDS = {
+      'AK': [0, 0], 'ME': [0, 11],
+      'WI': [1, 5], 'VT': [1, 10], 'NH': [1, 11],
+      'WA': [2, 1], 'ID': [2, 2], 'MT': [2, 3], 'ND': [2, 4], 'MN': [2, 5], 'IL': [2, 6], 'MI': [2, 7], 'NY': [2, 9], 'MA': [2, 10], 'RI': [2, 11],
+      'OR': [3, 1], 'NV': [3, 2], 'WY': [3, 3], 'SD': [3, 4], 'IA': [3, 5], 'IN': [3, 6], 'OH': [3, 7], 'PA': [3, 8], 'NJ': [3, 9], 'CT': [3, 10],
+      'CA': [4, 1], 'UT': [4, 2], 'CO': [4, 3], 'NE': [4, 4], 'MO': [4, 5], 'KY': [4, 6], 'WV': [4, 7], 'VA': [4, 8], 'MD': [4, 9], 'DE': [4, 10],
+      'AZ': [5, 2], 'NM': [5, 3], 'KS': [5, 4], 'AR': [5, 5], 'TN': [5, 6], 'NC': [5, 7], 'SC': [5, 8], 'DC': [5, 9],
+      'OK': [6, 4], 'LA': [6, 5], 'MS': [6, 6], 'AL': [6, 7], 'GA': [6, 8],
+      'HI': [7, 0], 'TX': [7, 4], 'FL': [7, 9]
+    };
+
+    /* Liste des petits États du Nord-Est pour le volet d'accès rapide */
+    const NE_STATES = ['VT', 'NH', 'MA', 'RI', 'CT', 'NJ', 'DE', 'MD', 'DC'];
+
+    /* Données nationales de référence par scrutin */
+    const NATIONAL_TOTALS = {
+      senate: {
+        demTotal: 54, demInOffice: 34, demWon: 20,
+        gopTotal: 44, gopInOffice: 31, gopWon: 13,
+        pending: 2, majority: 50,
+        demSubtext: '34 en fonction • 20 élus',
+        gopSubtext: '31 en fonction • 13 élus',
+        pendingText: '2 en attente'
+      },
+      house: {
+        demTotal: 251, demInOffice: 0, demWon: 251,
+        gopTotal: 155, gopInOffice: 0, gopWon: 155,
+        pending: 29, majority: 218,
+        demSubtext: 'Majorité atteinte (≥218)',
+        gopSubtext: '155 sièges déclarés',
+        pendingText: '29 en dépouillement'
+      },
+      governor: {
+        demTotal: 28, demInOffice: 12, demWon: 16,
+        gopTotal: 20, gopInOffice: 8, gopWon: 12,
+        pending: 2, majority: 26,
+        demSubtext: '12 en fonction • 16 élus',
+        gopSubtext: '8 en fonction • 12 élus',
+        pendingText: '2 en attente'
+      }
+    };
+
+    /* ==========================================================================
+       2. État applicatif & Variables globales
+       ========================================================================== */
+    let currentRace = 'senate';       // 'senate' | 'house' | 'governor'
+    let currentView = 'geo';          // 'geo' | 'carto'
+    let currentFilter = 'all';        // 'all' | 'dem' | 'gop' | 'flipped' | 'pending'
+    let selectedStateCode = null;     // Code d'État sélectionné (ex: 'PA')
+    let searchQuery = '';
+    let geoFeatures = [];
+
+    /* ==========================================================================
+       3. Initialisation de l'application
+       ========================================================================== */
+    document.addEventListener('DOMContentLoaded', function() {
+      initCartoGrid();
+      initNortheastPills();
+      initGeoMap();
+      updateGauge(currentRace);
+      renderInspector();
+    });
+
+    /* ==========================================================================
+       4. Fonctions de changement de scrutin (Sénat, Chambre, Gouverneurs)
+       ========================================================================== */
+    function selectRace(raceKey) {
+      if (!['senate', 'house', 'governor'].includes(raceKey)) return;
+      currentRace = raceKey;
+
+      // Mise à jour visuelle des onglets
+      document.querySelectorAll('.race-tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.id === 'tab-' + raceKey);
+        btn.setAttribute('aria-selected', btn.id === 'tab-' + raceKey ? 'true' : 'false');
+      });
+
+      // Mise à jour de la surbrillance sur les cartes KPI
+      document.querySelectorAll('.kpi-card').forEach(card => {
+        card.classList.toggle('selected-kpi', card.id === 'kpi-' + raceKey);
+      });
+
+      updateGauge(raceKey);
+      refreshMapVisuals();
+      renderInspector();
+    }
+
+    function updateGauge(raceKey) {
+      const data = NATIONAL_TOTALS[raceKey];
+      if (!data) return;
+
+      const totalSeats = (raceKey === 'house') ? 435 : (raceKey === 'governor') ? 50 : 100;
+
+      // Mettre à jour les textes
+      const demCountEl = document.getElementById('gauge-dem-count');
+      const gopCountEl = document.getElementById('gauge-gop-count');
+      const demSubEl = document.getElementById('gauge-dem-subtext');
+      const gopSubEl = document.getElementById('gauge-gop-subtext');
+      const threshValEl = document.getElementById('gauge-threshold-val');
+      const threshTextEl = document.getElementById('majority-threshold-text');
+      const pendingTextEl = document.getElementById('gauge-pending-text');
+
+      if (demCountEl) demCountEl.textContent = data.demTotal;
+      if (gopCountEl) gopCountEl.textContent = data.gopTotal;
+      if (demSubEl) demSubEl.textContent = data.demSubtext;
+      if (gopSubEl) gopSubEl.textContent = data.gopSubtext;
+      if (threshValEl) threshValEl.textContent = data.majority;
+      if (threshTextEl) threshTextEl.textContent = data.majority + ' sièges';
+      if (pendingTextEl) pendingTextEl.textContent = data.pendingText;
+
+      // Mettre à jour les segments de la jauge proportionnelle
+      const pctDemInOffice = (data.demInOffice / totalSeats) * 100;
+      const pctDemWon = (data.demWon / totalSeats) * 100;
+      const pctPending = (data.pending / totalSeats) * 100;
+      const pctGopWon = (data.gopWon / totalSeats) * 100;
+      const pctGopInOffice = (data.gopInOffice / totalSeats) * 100;
+      const majorityPosition = (data.majority / totalSeats) * 100;
+
+      const barDemInOffice = document.getElementById('bar-dem-in-office');
+      const barDemWon = document.getElementById('bar-dem-won');
+      const barPending = document.getElementById('bar-pending');
+      const barGopWon = document.getElementById('bar-gop-won');
+      const barGopInOffice = document.getElementById('bar-gop-in-office');
+      const marker = document.getElementById('gauge-majority-marker');
+
+      if (barDemInOffice) barDemInOffice.style.width = pctDemInOffice + '%';
+      if (barDemWon) barDemWon.style.width = pctDemWon + '%';
+      if (barPending) barPending.style.width = pctPending + '%';
+      if (barGopWon) barGopWon.style.width = pctGopWon + '%';
+      if (barGopInOffice) barGopInOffice.style.width = pctGopInOffice + '%';
+      if (marker) marker.style.left = majorityPosition + '%';
+    }
+
+    /* ==========================================================================
+       5. Bascule entre Carte Géographique et Grille de Sièges
+       ========================================================================== */
+    function switchView(viewMode) {
+      if (!['geo', 'carto'].includes(viewMode)) return;
+      currentView = viewMode;
+
+      const btnGeo = document.getElementById('btn-view-geo');
+      const btnCarto = document.getElementById('btn-view-carto');
+      const geoContainer = document.getElementById('geo-svg-container');
+      const cartoContainer = document.getElementById('carto-grid-container');
+      const nePanel = document.getElementById('ne-panel');
+
+      if (btnGeo) btnGeo.classList.toggle('active', viewMode === 'geo');
+      if (btnCarto) btnCarto.classList.toggle('active', viewMode === 'carto');
+
+      if (geoContainer) geoContainer.style.display = (viewMode === 'geo') ? 'block' : 'none';
+      if (cartoContainer) cartoContainer.style.display = (viewMode === 'carto') ? 'flex' : 'none';
+      if (nePanel) nePanel.style.display = (viewMode === 'geo') ? 'flex' : 'none';
+
+      refreshMapVisuals();
+    }
+
+    /* ==========================================================================
+       6. Filtres rapides et Recherche
+       ========================================================================== */
+    function applyFilter(filterKey) {
+      currentFilter = filterKey;
+      document.querySelectorAll('.filter-chip').forEach(chip => {
+        chip.classList.toggle('active', chip.id === 'filter-' + filterKey);
+      });
+      refreshMapVisuals();
+    }
+
+    function handleSearch(val) {
+      searchQuery = (val || '').trim().toLowerCase();
+      
+      // Si la recherche correspond exactement à un État (code ou nom), on le sélectionne
+      if (searchQuery.length >= 2) {
+        for (const [code, info] of Object.entries(STATES_DATA)) {
+          if (code.toLowerCase() === searchQuery || info.name.toLowerCase() === searchQuery) {
+            selectState(code);
+            return;
+          }
+        }
+      }
+      refreshMapVisuals();
+    }
+
+    /* ==========================================================================
+       7. Construction et Rendu de la Carte D3 Géographique
+       ========================================================================== */
+    function initGeoMap() {
+      const svg = d3.select('#geo-svg-container');
+      const g = svg.select('#states-group');
+
+      // Projection Albers USA pour coordonnées pré-projetées (states-albers-10m)
+      const path = d3.geoPath(d3.geoIdentity().scale(0.85).translate([60, 20]));
+
+      fetch('https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-albers-10m.json')
+        .then(res => res.json())
+        .then(topo => {
+          const statesFeature = topojson.feature(topo, topo.objects.states);
+          geoFeatures = statesFeature.features;
+
+          g.selectAll('path')
+            .data(geoFeatures)
+            .enter()
+            .append('path')
+            .attr('class', 'state-path')
+            .attr('d', path)
+            .attr('id', d => 'state-geo-' + getStateCodeByFips(d.id))
+            .attr('data-fips', d => d.id)
+            .attr('data-code', d => getStateCodeByFips(d.id))
+            .on('mouseenter', function(event, d) {
+              const code = getStateCodeByFips(d.id);
+              showTooltip(event, code);
+            })
+            .on('mousemove', function(event) {
+              moveTooltip(event);
+            })
+            .on('mouseleave', function() {
+              hideTooltip();
+            })
+            .on('click', function(event, d) {
+              const code = getStateCodeByFips(d.id);
+              selectState(code);
+            });
+
+          refreshMapVisuals();
+        })
+        .catch(err => {
+          console.warn('Chargement de states-albers-10m échoué, utilisation du mode cartogramme:', err);
+          switchView('carto');
+        });
+    }
+
+    function getStateCodeByFips(fips) {
+      const padded = String(fips).padStart(2, '0');
+      for (const [code, info] of Object.entries(STATES_DATA)) {
+        if (info.fips === padded) return code;
+      }
+      return null;
+    }
+
+    /* ==========================================================================
+       8. Construction de la Grille Cartogramme des Sièges
+       ========================================================================== */
+    function initCartoGrid() {
+      const container = document.getElementById('carto-tiles');
+      if (!container) return;
+      container.innerHTML = '';
+
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 12; c++) {
+          let foundCode = null;
+          for (const [code, pos] of Object.entries(CARTO_COORDS)) {
+            if (pos[0] === r && pos[1] === c) {
+              foundCode = code;
+              break;
+            }
+          }
+
+          if (foundCode) {
+            const cell = document.createElement('div');
+            cell.className = 'carto-cell';
+            cell.id = 'carto-cell-' + foundCode;
+            cell.setAttribute('data-code', foundCode);
+            cell.setAttribute('tabindex', '0');
+            cell.setAttribute('role', 'button');
+            cell.setAttribute('aria-label', (STATES_DATA[foundCode] ? STATES_DATA[foundCode].name : foundCode));
+
+            cell.innerHTML = `
+              <span class="carto-code">${foundCode}</span>
+              <span class="carto-sub" id="carto-sub-${foundCode}">—</span>
+              <span class="carto-flip-dot" id="carto-dot-${foundCode}" style="display: none;"></span>
+            `;
+
+            cell.addEventListener('mouseenter', function(e) {
+              showTooltip(e, foundCode);
+            });
+            cell.addEventListener('mouseleave', hideTooltip);
+            cell.addEventListener('click', function() {
+              selectState(foundCode);
+            });
+            cell.addEventListener('keydown', function(e) {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectState(foundCode);
+              }
+            });
+
+            container.appendChild(cell);
+          } else {
+            const emptyCell = document.createElement('div');
+            emptyCell.style.visibility = 'hidden';
+            container.appendChild(emptyCell);
+          }
+        }
+      }
+    }
+
+    /* ==========================================================================
+       9. Pastilles de sélection rapide des petits États de l'Est
+       ========================================================================== */
+    function initNortheastPills() {
+      const container = document.getElementById('ne-pills-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      NE_STATES.forEach(code => {
+        const info = STATES_DATA[code];
+        if (!info) return;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ne-pill-btn';
+        btn.id = 'ne-btn-' + code;
+        btn.title = info.name;
+        btn.innerHTML = `
+          <span>${code}</span>
+          <span class="ne-pill-indicator" id="ne-ind-${code}"></span>
+        `;
+        btn.addEventListener('click', () => selectState(code));
+        container.appendChild(btn);
+      });
+    }
+
+    /* ==========================================================================
+       10. Calcul des couleurs et mise à jour dynamique des visuels
+       ========================================================================== */
+    function getStateColorInfo(code) {
+      const state = STATES_DATA[code];
+      if (!state) return { fillClass: 'fill-no-race', isFlipped: false, label: '—', status: 'no_race' };
+
+      const raceInfo = state[currentRace];
+      if (!raceInfo) return { fillClass: 'fill-no-race', isFlipped: false, label: '—', status: 'no_race' };
+
+      if (currentRace === 'senate') {
+        if (!raceInfo.up) {
+          return {
+            fillClass: (raceInfo.incumbent === 'D') ? 'fill-dem-hold' : 'fill-gop-hold',
+            isFlipped: false,
+            label: (raceInfo.incumbent === 'D') ? 'Dém. (Non renouv.)' : 'Rép. (Non renouv.)',
+            status: 'no_race',
+            party: raceInfo.incumbent
+          };
+        }
+        if (raceInfo.status === 'pending') {
+          return { fillClass: 'fill-pending', isFlipped: false, label: 'En attente', status: 'pending' };
+        }
+        if (raceInfo.status === 'dem') {
+          return {
+            fillClass: raceInfo.flipped ? 'pattern-flipped-dem' : 'fill-dem',
+            isFlipped: raceInfo.flipped,
+            label: 'Démocrate',
+            status: 'dem',
+            party: 'D'
+          };
+        }
+        if (raceInfo.status === 'gop') {
+          return {
+            fillClass: raceInfo.flipped ? 'pattern-flipped-gop' : 'fill-gop',
+            isFlipped: raceInfo.flipped,
+            label: 'Républicain',
+            status: 'gop',
+            party: 'R'
+          };
+        }
+      } else if (currentRace === 'house') {
+        // Pour la Chambre des représentants
+        if (raceInfo.dem > raceInfo.gop) {
+          return { fillClass: 'fill-dem', isFlipped: false, label: raceInfo.dem + 'D - ' + raceInfo.gop + 'R', status: 'dem', party: 'D' };
+        } else if (raceInfo.gop > raceInfo.dem) {
+          return { fillClass: 'fill-gop', isFlipped: false, label: raceInfo.gop + 'R - ' + raceInfo.dem + 'D', status: 'gop', party: 'R' };
+        } else {
+          return { fillClass: 'fill-pending', isFlipped: false, label: 'Égalité', status: 'pending' };
+        }
+      } else if (currentRace === 'governor') {
+        if (!raceInfo.up) {
+          return { fillClass: 'fill-no-race', isFlipped: false, label: 'Pas de scrutin', status: 'no_race' };
+        }
+        if (raceInfo.status === 'pending') {
+          return { fillClass: 'fill-pending', isFlipped: false, label: 'En attente', status: 'pending' };
+        }
+        if (raceInfo.status === 'dem') {
+          return {
+            fillClass: raceInfo.flipped ? 'pattern-flipped-dem' : 'fill-dem',
+            isFlipped: raceInfo.flipped,
+            label: 'Démocrate',
+            status: 'dem',
+            party: 'D'
+          };
+        }
+        if (raceInfo.status === 'gop') {
+          return {
+            fillClass: raceInfo.flipped ? 'pattern-flipped-gop' : 'fill-gop',
+            isFlipped: raceInfo.flipped,
+            label: 'Républicain',
+            status: 'gop',
+            party: 'R'
+          };
+        }
+      }
+
+      return { fillClass: 'fill-no-race', isFlipped: false, label: '—', status: 'no_race' };
+    }
+
+    function doesStateMatchFilter(code) {
+      const state = STATES_DATA[code];
+      if (!state) return false;
+
+      // Filtre de recherche texte
+      if (searchQuery) {
+        const nameMatch = state.name.toLowerCase().includes(searchQuery);
+        const codeMatch = code.toLowerCase().includes(searchQuery);
+        if (!nameMatch && !codeMatch) return false;
+      }
+
+      if (currentFilter === 'all') return true;
+
+      const raceInfo = state[currentRace];
+      if (!raceInfo) return false;
+
+      if (currentFilter === 'dem') {
+        if (currentRace === 'house') return raceInfo.dem > raceInfo.gop;
+        return raceInfo.status === 'dem' || (raceInfo.status === 'no_race' && raceInfo.incumbent === 'D');
+      }
+      if (currentFilter === 'gop') {
+        if (currentRace === 'house') return raceInfo.gop > raceInfo.dem;
+        return raceInfo.status === 'gop' || (raceInfo.status === 'no_race' && raceInfo.incumbent === 'R');
+      }
+      if (currentFilter === 'flipped') {
+        return Boolean(raceInfo.flipped);
+      }
+      if (currentFilter === 'pending') {
+        return raceInfo.status === 'pending' || (raceInfo.pending && raceInfo.pending > 0);
+      }
+
+      return true;
+    }
+
+    function refreshMapVisuals() {
+      // 1. Mettre à jour la carte géographique SVG
+      d3.selectAll('.state-path').each(function() {
+        const el = d3.select(this);
+        const code = el.attr('data-code');
+        if (!code) return;
+
+        const colorInfo = getStateColorInfo(code);
+        const matches = doesStateMatchFilter(code);
+
+        // Réinitialiser les classes
+        el.attr('class', 'state-path ' + colorInfo.fillClass);
+        el.classed('is-selected', code === selectedStateCode);
+        el.classed('dimmed', !matches);
+      });
+
+      // 2. Mettre à jour la grille de sièges (Cartogramme)
+      document.querySelectorAll('.carto-cell').forEach(cell => {
+        const code = cell.getAttribute('data-code');
+        if (!code) return;
+
+        const colorInfo = getStateColorInfo(code);
+        const matches = doesStateMatchFilter(code);
+
+        // Appliquer classes de fond
+        cell.className = 'carto-cell ' + colorInfo.fillClass;
+        cell.classList.toggle('is-selected', code === selectedStateCode);
+        cell.classList.toggle('dimmed', !matches);
+
+        // Sous-texte
+        const sub = document.getElementById('carto-sub-' + code);
+        if (sub) {
+          if (currentRace === 'house') {
+            const h = STATES_DATA[code].house;
+            sub.textContent = h.dem + 'D/' + h.gop + 'R';
+          } else {
+            sub.textContent = colorInfo.party || (colorInfo.status === 'pending' ? '?' : '—');
+          }
+        }
+
+        // Indicateur de bascule (Flipped)
+        const dot = document.getElementById('carto-dot-' + code);
+        if (dot) {
+          dot.style.display = colorInfo.isFlipped ? 'block' : 'none';
+        }
+      });
+
+      // 3. Mettre à jour les pastilles Nord-Est
+      NE_STATES.forEach(code => {
+        const btn = document.getElementById('ne-btn-' + code);
+        const ind = document.getElementById('ne-ind-' + code);
+        if (!btn || !ind) return;
+
+        const colorInfo = getStateColorInfo(code);
+        btn.classList.toggle('is-active', code === selectedStateCode);
+
+        ind.className = 'ne-pill-indicator ' + colorInfo.fillClass;
+      });
+    }
+
+    /* ==========================================================================
+       11. Gestion des interactions d'État (Sélection & Réinitialisation)
+       ========================================================================== */
+    function selectState(code) {
+      if (!STATES_DATA[code]) return;
+      selectedStateCode = code;
+      refreshMapVisuals();
+      renderInspector();
+    }
+
+    function resetStateSelection() {
+      selectedStateCode = null;
+      refreshMapVisuals();
+      renderInspector();
+    }
+
+    /* ==========================================================================
+       12. Panneau d'inspection détaillé
+       ========================================================================== */
+    function renderInspector() {
+      const taglineEl = document.getElementById('inspector-tagline');
+      const nameEl = document.getElementById('inspector-name');
+      const abbrEl = document.getElementById('inspector-abbr');
+      const flipBox = document.getElementById('flip-alert-box');
+      const flipText = document.getElementById('flip-alert-text');
+      const contentEl = document.getElementById('inspector-content');
+      const resetBtn = document.getElementById('btn-reset-selection');
+
+      if (!contentEl) return;
+
+      if (!selectedStateCode) {
+        // Vue d'ensemble nationale par défaut
+        if (taglineEl) taglineEl.textContent = 'Synthèse nationale';
+        if (nameEl) nameEl.textContent = 'États clés & Scrutins serrés';
+        if (abbrEl) abbrEl.textContent = 'USA';
+        if (flipBox) flipBox.style.display = 'none';
+        if (resetBtn) resetBtn.style.display = 'none';
+
+        contentEl.innerHTML = `
+          <p style="font-size: 0.8125rem; color: var(--on-surface-variant); margin-bottom: var(--space-xs);">
+            Cliquez sur un État sur la carte ou dans la grille pour afficher le décompte détaillé de ses scrutins.
+          </p>
+          <div class="battlegrounds-quicklist">
+            <button type="button" class="battleground-btn" onclick="selectState('PA')">
+              <span class="battleground-btn-name">Pennsylvanie (PA)</span>
+              <span class="battleground-btn-meta">
+                <span class="race-box-badge dem">Gov D</span>
+                <span class="race-box-badge dem">10D - 7R</span>
+              </span>
+            </button>
+            <button type="button" class="battleground-btn" onclick="selectState('GA')">
+              <span class="battleground-btn-name">Géorgie (GA)</span>
+              <span class="battleground-btn-meta">
+                <span class="race-box-badge dem">Sénat D</span>
+                <span class="race-box-badge dem" style="background-color: var(--primary-container); color: var(--on-surface);">Bascule Gov</span>
+              </span>
+            </button>
+            <button type="button" class="battleground-btn" onclick="selectState('MI')">
+              <span class="battleground-btn-name">Michigan (MI)</span>
+              <span class="battleground-btn-meta">
+                <span class="race-box-badge dem">Sénat D</span>
+                <span class="race-box-badge dem">Gov D</span>
+              </span>
+            </button>
+            <button type="button" class="battleground-btn" onclick="selectState('TX')">
+              <span class="battleground-btn-name">Texas (TX)</span>
+              <span class="battleground-btn-meta">
+                <span class="race-box-badge dem" style="background-color: var(--primary-container); color: var(--on-surface);">Bascule Sénat</span>
+                <span class="race-box-badge gop">Gov R</span>
+              </span>
+            </button>
+            <button type="button" class="battleground-btn" onclick="selectState('OH')">
+              <span class="battleground-btn-name">Ohio (OH)</span>
+              <span class="battleground-btn-meta">
+                <span class="race-box-badge dem" style="background-color: var(--primary-container); color: var(--on-surface);">Bascule Sénat</span>
+                <span class="race-box-badge gop">Gov R</span>
+              </span>
+            </button>
+            <button type="button" class="battleground-btn" onclick="selectState('NC')">
+              <span class="battleground-btn-name">Caroline du Nord (NC)</span>
+              <span class="battleground-btn-meta">
+                <span class="race-box-badge pending">Sénat serré</span>
+                <span class="race-box-badge no-race">7D - 7R</span>
+              </span>
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      // Vue spécifique d'un État
+      const state = STATES_DATA[selectedStateCode];
+      if (!state) return;
+
+      if (taglineEl) taglineEl.textContent = 'Résultats détaillés';
+      if (nameEl) nameEl.textContent = state.name;
+      if (abbrEl) abbrEl.textContent = selectedStateCode;
+      if (resetBtn) resetBtn.style.display = 'inline-block';
+
+      // Vérifier si un scrutin a basculé dans cet État
+      const isFlippedSenate = state.senate.flipped;
+      const isFlippedGov = state.gov.flipped;
+
+      if (flipBox && flipText) {
+        if (isFlippedSenate || isFlippedGov) {
+          flipBox.style.display = 'flex';
+          let msg = 'Siège basculé en 2026 : ';
+          if (isFlippedSenate) msg += 'Sénat (' + (state.senate.status === 'dem' ? '+1 Démocrate' : '+1 Républicain') + ') ';
+          if (isFlippedGov) msg += 'Gouvernorat (' + (state.gov.status === 'dem' ? '+1 Démocrate' : '+1 Républicain') + ')';
+          flipText.textContent = msg;
+        } else {
+          flipBox.style.display = 'none';
+        }
+      }
+
+      // Formater le bloc Sénat
+      let senateHtml = '';
+      if (!state.senate.up) {
+        senateHtml = `
+          <div class="race-box">
+            <div class="race-box-header">
+              <span class="race-box-title">Sénat fédéral</span>
+              <span class="race-box-badge no-race">Non renouvelé</span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--on-surface-variant); margin-top: 4px;">
+              Mandat en cours (${state.senate.incumbent === 'D' ? 'Parti démocrate' : 'Parti républicain'}). Prochain renouvellement au cycle régulier.
+            </p>
+          </div>
+        `;
+      } else if (state.senate.status === 'pending') {
+        senateHtml = `
+          <div class="race-box">
+            <div class="race-box-header">
+              <span class="race-box-title">Sénat fédéral</span>
+              <span class="race-box-badge pending">En attente</span>
+            </div>
+            <div class="candidate-row">
+              <span class="candidate-name"><span class="candidate-party-dot dem"></span>${state.senate.candD}</span>
+              <span class="candidate-votes">${state.senate.pctD}</span>
+            </div>
+            <div class="candidate-row">
+              <span class="candidate-name"><span class="candidate-party-dot gop"></span>${state.senate.candR}</span>
+              <span class="candidate-votes">${state.senate.pctR}</span>
+            </div>
+            <div class="reporting-stat">
+              <span>Dépouillement estimé</span>
+              <span>${state.senate.reporting}</span>
+            </div>
+          </div>
+        `;
+      } else {
+        const isDemWin = state.senate.status === 'dem';
+        senateHtml = `
+          <div class="race-box">
+            <div class="race-box-header">
+              <span class="race-box-title">Sénat fédéral</span>
+              <span class="race-box-badge ${isDemWin ? 'dem' : 'gop'}">
+                ${isDemWin ? 'Victoire Démocrate' : 'Victoire Républicaine'} ${state.senate.flipped ? '(Bascule)' : ''}
+              </span>
+            </div>
+            <div class="candidate-row" style="${isDemWin ? 'font-weight: 700;' : ''}">
+              <span class="candidate-name"><span class="candidate-party-dot dem"></span>${state.senate.candD} ${isDemWin ? '✓' : ''}</span>
+              <span class="candidate-votes">${state.senate.pctD}</span>
+            </div>
+            <div class="candidate-row" style="${!isDemWin ? 'font-weight: 700;' : ''}">
+              <span class="candidate-name"><span class="candidate-party-dot gop"></span>${state.senate.candR} ${!isDemWin ? '✓' : ''}</span>
+              <span class="candidate-votes">${state.senate.pctR}</span>
+            </div>
+            <div class="reporting-stat">
+              <span>Dépouillement estimé</span>
+              <span>${state.senate.reporting}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      // Formater le bloc Chambre des représentants
+      const house = state.house;
+      const houseHtml = `
+        <div class="race-box">
+          <div class="race-box-header">
+            <span class="race-box-title">Chambre des représentants</span>
+            <span class="race-box-badge no-race">${house.total} district${house.total > 1 ? 's' : ''}</span>
+          </div>
+          <div class="house-seats-split" style="margin-top: 4px;">
+            <div class="house-seat-pill dem">${house.dem} Démocrate${house.dem > 1 ? 's' : ''}</div>
+            <div class="house-seat-pill gop">${house.gop} Républicain${house.gop > 1 ? 's' : ''}</div>
+          </div>
+          ${house.pending > 0 ? `<div class="reporting-stat" style="margin-top: 4px;"><span>En attente de dépouillement</span><span>${house.pending} district(s)</span></div>` : ''}
+        </div>
+      `;
+
+      // Formater le bloc Gouverneur
+      let govHtml = '';
+      if (!state.gov.up) {
+        govHtml = `
+          <div class="race-box">
+            <div class="race-box-header">
+              <span class="race-box-title">Gouvernorat</span>
+              <span class="race-box-badge no-race">Pas de scrutin</span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--on-surface-variant); margin-top: 4px;">
+              ${state.gov.note || 'Pas d\'élection au poste de gouverneur lors de ce scrutin.'}
+            </p>
+          </div>
+        `;
+      } else if (state.gov.status === 'pending') {
+        govHtml = `
+          <div class="race-box">
+            <div class="race-box-header">
+              <span class="race-box-title">Gouvernorat</span>
+              <span class="race-box-badge pending">En attente</span>
+            </div>
+            <div class="candidate-row">
+              <span class="candidate-name"><span class="candidate-party-dot dem"></span>${state.gov.candD}</span>
+              <span class="candidate-votes">${state.gov.pctD}</span>
+            </div>
+            <div class="candidate-row">
+              <span class="candidate-name"><span class="candidate-party-dot gop"></span>${state.gov.candR}</span>
+              <span class="candidate-votes">${state.gov.pctR}</span>
+            </div>
+            <div class="reporting-stat">
+              <span>Dépouillement estimé</span>
+              <span>${state.gov.reporting}</span>
+            </div>
+          </div>
+        `;
+      } else {
+        const isDemWin = state.gov.status === 'dem';
+        govHtml = `
+          <div class="race-box">
+            <div class="race-box-header">
+              <span class="race-box-title">Gouvernorat</span>
+              <span class="race-box-badge ${isDemWin ? 'dem' : 'gop'}">
+                ${isDemWin ? 'Victoire Démocrate' : 'Victoire Républicaine'} ${state.gov.flipped ? '(Bascule)' : ''}
+              </span>
+            </div>
+            <div class="candidate-row" style="${isDemWin ? 'font-weight: 700;' : ''}">
+              <span class="candidate-name"><span class="candidate-party-dot dem"></span>${state.gov.candD} ${isDemWin ? '✓' : ''}</span>
+              <span class="candidate-votes">${state.gov.pctD}</span>
+            </div>
+            <div class="candidate-row" style="${!isDemWin ? 'font-weight: 700;' : ''}">
+              <span class="candidate-name"><span class="candidate-party-dot gop"></span>${state.gov.candR} ${!isDemWin ? '✓' : ''}</span>
+              <span class="candidate-votes">${state.gov.pctR}</span>
+            </div>
+            <div class="reporting-stat">
+              <span>Dépouillement estimé</span>
+              <span>${state.gov.reporting}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      contentEl.innerHTML = senateHtml + houseHtml + govHtml;
+    }
+
+    /* ==========================================================================
+       13. Gestion de l'infobulle (Tooltip)
+       ========================================================================== */
+    const tooltipEl = document.getElementById('map-tooltip');
+
+    function showTooltip(event, code) {
+      if (!tooltipEl || !STATES_DATA[code]) return;
+      const state = STATES_DATA[code];
+      const colorInfo = getStateColorInfo(code);
+
+      let raceSummary = '';
+      if (currentRace === 'senate') {
+        raceSummary = state.senate.up 
+          ? (state.senate.status === 'pending' ? 'Scrutin en cours' : (state.senate.status === 'dem' ? 'Démocrate ' + state.senate.pctD : 'Républicain ' + state.senate.pctR))
+          : 'Non renouvelé en 2026';
+      } else if (currentRace === 'house') {
+        raceSummary = state.house.dem + ' Dem. • ' + state.house.gop + ' Rép.';
+      } else if (currentRace === 'governor') {
+        raceSummary = state.gov.up
+          ? (state.gov.status === 'pending' ? 'Scrutin en cours' : (state.gov.status === 'dem' ? 'Démocrate ' + state.gov.pctD : 'Républicain ' + state.gov.pctR))
+          : 'Pas d\'élection en 2026';
+      }
+
+      tooltipEl.innerHTML = `
+        <div class="tooltip-title">${state.name} (${code})</div>
+        <div class="tooltip-row">
+          <span>${currentRace === 'senate' ? 'Sénat' : (currentRace === 'house' ? 'Chambre' : 'Gouverneur')} :</span>
+          <strong>${raceSummary}</strong>
+        </div>
+        ${colorInfo.isFlipped ? '<div style="margin-top: 4px; color: var(--primary-container); font-size: 0.68rem; font-weight: 700;">★ SIÈGE BASCULÉ</div>' : ''}
+      `;
+
+      tooltipEl.style.display = 'block';
+      moveTooltip(event);
+    }
+
+    function moveTooltip(event) {
+      if (!tooltipEl) return;
+      const x = event.pageX || (event.clientX + window.scrollX);
+      const y = event.pageY || (event.clientY + window.scrollY);
+      tooltipEl.style.left = (x + 14) + 'px';
+      tooltipEl.style.top = (y + 14) + 'px';
+    }
+
+    function hideTooltip() {
+      if (tooltipEl) tooltipEl.style.display = 'none';
+    }
+  </script>
+</body>
+</html>
